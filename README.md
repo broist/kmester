@@ -1,6 +1,8 @@
 # KalóriaMester
 
-Egy egyfelhasználós, mobilra optimalizált, önhostolt kalória- és tápanyag-napló. Napi étkezési naplót, gramm alapú számítást, saját ételeket, vonalkódos termékfelismerést és JSON exportot ad.
+Egy egyfelhasználós, telefonra és tabletre optimalizált, önhostolt kalória- és tápanyag-napló. Napi étkezési naplót, gramm alapú számítást, saját ételeket, vonalkódos termékfelismerést, magyar alapélelmiszer-katalógust és JSON exportot ad.
+
+Az első backend-indulás automatikusan betölt egy helyben tárolt, magyarul kereshető alapélelmiszer-katalógust. A nyers és főtt állapot külön tétel, az értékek 100 grammra vonatkoznak, forrásuk a közkincs [USDA FoodData Central](https://fdc.nal.usda.gov/). Ezek átlagos értékek, ezért az alkalmazás becsültként jelöli őket; szerkesztés után a saját változat marad meg, az induló betöltés nem írja felül.
 
 ## Indítás Linux szerveren
 

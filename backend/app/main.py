@@ -10,8 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, create_engine, func, select
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, create_engine, func, or_, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
+from .seed_foods import STARTER_FOODS, as_food_kwargs
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 SECRET = os.environ["APP_SECRET"]
@@ -73,7 +74,7 @@ class FoodIn(BaseModel):
     name: str = Field(min_length=1, max_length=250); brand: str | None = None; barcode: str | None = None
     serving_size_g: Decimal | None = Field(None, ge=0); kcal: Decimal = Field(ge=0); protein: Decimal = Field(ge=0); carbs: Decimal = Field(ge=0); fat: Decimal = Field(ge=0)
     fiber: Decimal | None = Field(None, ge=0); sugar: Decimal | None = Field(None, ge=0); saturated_fat: Decimal | None = Field(None, ge=0); salt: Decimal | None = Field(None, ge=0)
-    source: Literal["open_food_facts", "manual", "recipe", "estimated"] = "manual"; confidence: Literal["precise", "incomplete", "estimated"] = "precise"; verified_by_user: bool = False; notes: str | None = None
+    source: Literal["open_food_facts", "manual", "recipe", "estimated", "usda"] = "manual"; confidence: Literal["precise", "incomplete", "estimated"] = "precise"; verified_by_user: bool = False; notes: str | None = None
 class EntryIn(BaseModel): food_id: int; log_date: date; meal: Literal["breakfast","lunch","dinner","snack"]; grams: Decimal = Field(gt=0)
 class Login(BaseModel): username: str; password: str
 class ProfileIn(BaseModel):
@@ -122,7 +123,13 @@ def calculate_profile(p: Profile):
 app = FastAPI(title="KalóriaMester")
 app.add_middleware(CORSMiddleware, allow_origins=[os.getenv("APP_URL", "http://localhost:5173")], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 @app.on_event("startup")
-def start(): Base.metadata.create_all(engine)
+def start():
+    Base.metadata.create_all(engine)
+    with SessionLocal() as s:
+        existing = set(s.scalars(select(Food.name).where(Food.source == "usda")))
+        for row in STARTER_FOODS:
+            if row[0] not in existing: s.add(Food(**as_food_kwargs(row)))
+        s.commit()
 @app.get("/health")
 def health(): return {"ok": True}
 @app.post("/api/auth/login")
@@ -142,7 +149,9 @@ def update_profile(data: ProfileIn, s: Session = Depends(db), _: dict = Depends(
     return {"profile": {c.name: (float(getattr(p,c.name)) if isinstance(getattr(p,c.name), Decimal) else getattr(p,c.name)) for c in Profile.__table__.columns}, "calculation": calculate_profile(p)}
 @app.get("/api/foods")
 def foods(q: str = "", s: Session = Depends(db), _: dict = Depends(user)):
-    return [serialize_food(x) for x in s.scalars(select(Food).where(Food.name.ilike(f"%{q}%")).order_by(Food.updated_at.desc()).limit(40))]
+    pattern=f"%{q.strip()}%"
+    match=or_(Food.name.ilike(pattern),Food.brand.ilike(pattern),Food.notes.ilike(pattern))
+    return [serialize_food(x) for x in s.scalars(select(Food).where(match).order_by(Food.name).limit(80))]
 @app.post("/api/foods")
 def add_food(data: FoodIn, s: Session = Depends(db), _: dict = Depends(user)):
     f=Food(**data.model_dump()); s.add(f); s.commit(); s.refresh(f); return serialize_food(f)
