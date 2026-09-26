@@ -55,6 +55,20 @@ class MealEntry(Base):
     grams: Mapped[Decimal] = mapped_column(Numeric(10,2))
     food: Mapped[Food] = relationship()
 
+class Profile(Base):
+    """Single-user profile and a deliberately transparent calorie estimate."""
+    __tablename__ = "profile"
+    id: Mapped[int] = mapped_column(primary_key=True, default=1)
+    sex: Mapped[str] = mapped_column(String(16), default="other")
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    height_cm: Mapped[Decimal | None] = mapped_column(Numeric(6,2), nullable=True)
+    weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(6,2), nullable=True)
+    activity: Mapped[str] = mapped_column(String(24), default="sedentary")
+    target_weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(6,2), nullable=True)
+    target_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    weekly_loss_kg: Mapped[Decimal] = mapped_column(Numeric(4,2), default=Decimal("0.50"))
+    calorie_override: Mapped[Decimal | None] = mapped_column(Numeric(8,1), nullable=True)
+
 class FoodIn(BaseModel):
     name: str = Field(min_length=1, max_length=250); brand: str | None = None; barcode: str | None = None
     serving_size_g: Decimal | None = Field(None, ge=0); kcal: Decimal = Field(ge=0); protein: Decimal = Field(ge=0); carbs: Decimal = Field(ge=0); fat: Decimal = Field(ge=0)
@@ -62,6 +76,16 @@ class FoodIn(BaseModel):
     source: Literal["open_food_facts", "manual", "recipe", "estimated"] = "manual"; confidence: Literal["precise", "incomplete", "estimated"] = "precise"; verified_by_user: bool = False; notes: str | None = None
 class EntryIn(BaseModel): food_id: int; log_date: date; meal: Literal["breakfast","lunch","dinner","snack"]; grams: Decimal = Field(gt=0)
 class Login(BaseModel): username: str; password: str
+class ProfileIn(BaseModel):
+    sex: Literal["female", "male", "other"] = "other"
+    birth_date: date | None = None
+    height_cm: Decimal | None = Field(None, ge=80, le=250)
+    weight_kg: Decimal | None = Field(None, ge=25, le=400)
+    activity: Literal["sedentary", "light", "moderate", "active", "very_active"] = "sedentary"
+    target_weight_kg: Decimal | None = Field(None, ge=25, le=400)
+    target_date: date | None = None
+    weekly_loss_kg: Decimal = Field(Decimal("0.50"), ge=0, le=2)
+    calorie_override: Decimal | None = Field(None, ge=800, le=8000)
 
 def db():
     with SessionLocal() as s: yield s
@@ -74,6 +98,26 @@ def validate_barcode(code: str):
     code = ''.join(c for c in code if c.isdigit())
     if len(code) not in (6, 8, 12, 13): raise HTTPException(422, "EAN-8, EAN-13, UPC-A vagy UPC-E vonalkód szükséges")
     return code
+def calculate_profile(p: Profile):
+    result = {"configured": False, "bmr": None, "maintenance": None, "daily_target": None, "weekly_loss_kg": float(p.weekly_loss_kg), "deadline_weekly_loss_kg": None, "warning": None}
+    if not (p.birth_date and p.height_cm and p.weight_kg): return result
+    age = (date.today() - p.birth_date).days / 365.2425
+    sex_constant = 5 if p.sex == "male" else -161 if p.sex == "female" else -78
+    bmr = 10 * float(p.weight_kg) + 6.25 * float(p.height_cm) - 5 * age + sex_constant
+    maintenance = bmr * {"sedentary": 1.2, "light": 1.375, "moderate": 1.55, "active": 1.725, "very_active": 1.9}[p.activity]
+    weekly = float(p.weekly_loss_kg)
+    if p.target_weight_kg is not None and p.target_date and p.target_date > date.today() and float(p.target_weight_kg) < float(p.weight_kg):
+        weekly = (float(p.weight_kg) - float(p.target_weight_kg)) * 7 / (p.target_date - date.today()).days
+        result["deadline_weekly_loss_kg"] = round(weekly, 2)
+    target = float(p.calorie_override) if p.calorie_override is not None else maintenance - weekly * 1100
+    minimum = 1500 if p.sex == "male" else 1200
+    if p.calorie_override is None and target < minimum:
+        target = minimum
+        result["warning"] = "A célidőpont túl nagy megszorítást igényelne, ezért a becsült napi cél biztonsági alsó korlátot használ."
+    elif weekly > 1:
+        result["warning"] = "Az 1 kg/hét feletti cél általában nem javasolt orvosi felügyelet nélkül."
+    result.update(configured=True, bmr=round(bmr), maintenance=round(maintenance), daily_target=round(target), weekly_loss_kg=round(weekly, 2))
+    return result
 
 app = FastAPI(title="KalóriaMester")
 app.add_middleware(CORSMiddleware, allow_origins=[os.getenv("APP_URL", "http://localhost:5173")], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -85,6 +129,17 @@ def health(): return {"ok": True}
 def login(data: Login):
     if data.username != USERNAME or data.password != PASSWORD: raise HTTPException(401, "Hibás felhasználónév vagy jelszó")
     return {"token": jwt.encode({"sub": USERNAME, "exp": datetime.now(timezone.utc)+timedelta(days=30)}, SECRET, algorithm="HS256")}
+@app.get("/api/profile")
+def get_profile(s: Session = Depends(db), _: dict = Depends(user)):
+    p = s.get(Profile, 1) or Profile(id=1)
+    if s.get(Profile, 1) is None: s.add(p); s.commit(); s.refresh(p)
+    return {"profile": {c.name: (float(getattr(p,c.name)) if isinstance(getattr(p,c.name), Decimal) else getattr(p,c.name)) for c in Profile.__table__.columns}, "calculation": calculate_profile(p)}
+@app.put("/api/profile")
+def update_profile(data: ProfileIn, s: Session = Depends(db), _: dict = Depends(user)):
+    p = s.get(Profile, 1) or Profile(id=1)
+    for k,v in data.model_dump().items(): setattr(p,k,v)
+    s.add(p); s.commit(); s.refresh(p)
+    return {"profile": {c.name: (float(getattr(p,c.name)) if isinstance(getattr(p,c.name), Decimal) else getattr(p,c.name)) for c in Profile.__table__.columns}, "calculation": calculate_profile(p)}
 @app.get("/api/foods")
 def foods(q: str = "", s: Session = Depends(db), _: dict = Depends(user)):
     return [serialize_food(x) for x in s.scalars(select(Food).where(Food.name.ilike(f"%{q}%")).order_by(Food.updated_at.desc()).limit(40))]
