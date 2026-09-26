@@ -14,30 +14,22 @@ docker compose up -d --build
 
 Ezután az app a `http://szerver:8080` címen elérhető. Az első belépéshez az `APP_USERNAME` és `APP_PASSWORD` értékeit használd. Nincs publikus regisztráció.
 
-## HTTPS és reverse proxy
+## HTTPS és meglévő Nginx
 
-A frontend konténer a `HTTP_PORT` változóban megadott porton szolgál ki, és `/api/` alatt továbbítja a kéréseket a belső backendnek. Ezért Caddy vagy Nginx elé közvetlenül betehető. Kamera-hozzáférés éles mobilos használathoz **HTTPS-t igényel** (a `localhost` fejlesztési kivétel).
+Nem szükséges Caddy vagy második reverse proxy. A frontend csak statikus fájlokat szolgál ki a host `127.0.0.1:8080` portján, a backend pedig a `127.0.0.1:8000` porton marad. A hoston futó meglévő Nginx közvetlenül a backendhez továbbítja az `/api/` kéréseket, a többit a frontendhez. A kész példa: [`deploy/nginx-kmester.conf`](deploy/nginx-kmester.conf). Kamera-hozzáférés éles mobilos használathoz **HTTPS-t igényel** (a `localhost` fejlesztési kivétel).
 
-Caddy példa:
-
-```caddy
-kaloria.example.com {
-  reverse_proxy 127.0.0.1:8080
-}
-```
-
-Állítsd az `APP_URL`-t a tényleges, HTTPS-es URL-re, majd indítsd újra: `docker compose up -d`. Caddy automatikusan kezeli a tanúsítványt, ha a domain DNS-e a szerverre mutat és a 80/443-as port elérhető.
+Állítsd az `APP_URL`-t a tényleges HTTPS-es URL-re, majd indítsd újra: `docker compose up -d`.
 
 ### Teljes Ubuntu/Debian élesítés
 
-Ha a domain már a szerver publikus IP-jére mutat, az egyszeri, rootként futtatandó telepítő felrakja a Dockert és Caddyt, klónozza a repót, beállítja a HTTPS reverse proxyt, indítja az alkalmazást, és napi adatbázis-mentést állít be:
+Ha a domain már a szerver publikus IP-jére mutat, az egyszeri, rootként futtatandó telepítő felrakja a Dockert és Nginxet, klónozza a repót, beállítja az HTTPS reverse proxyt, indítja az alkalmazást, és napi adatbázis-mentést állít be:
 
 ```bash
 git clone https://github.com/broist/kmester.git /opt/kmester
 cd /opt/kmester
 cp .env.example .env
 nano .env  # cseréld a titkokat, majd mentsd el
-DEPLOY_DOMAIN=kaloria.example.com ./deploy/install-ubuntu.sh
+DEPLOY_DOMAIN=kaloria.example.com CERTBOT_EMAIL=te@pelda.hu ./deploy/install-ubuntu.sh
 ```
 
 A mentések alapértelmezetten `/var/backups/kmester` alatt készülnek, 14 napig maradnak meg. Ezt a könyvtárat másold rendszeresen külső tárhelyre is. Frissítéskor: `cd /opt/kmester && git pull --ff-only && docker compose up -d --build`.
