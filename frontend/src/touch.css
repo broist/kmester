@@ -1,0 +1,41 @@
+/* Phone and tablet application shell, including landscape and safe areas. */
+.sidebar{display:none}
+.app-shell{display:block}
+.workspace{width:100%;max-width:1120px;margin:0 auto;padding:24px max(20px,env(safe-area-inset-right)) calc(110px + env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left))}
+.mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:30;justify-content:space-around;align-items:center;gap:4px;padding:10px max(12px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:#fafcf4f5;backdrop-filter:blur(18px);border-top:1px solid #dfe5d4}
+.mobile-nav button{background:none;display:grid;gap:3px;place-items:center;color:#68765b;font-size:23px;min-width:48px;min-height:48px;flex:1;max-width:140px}
+.mobile-nav span{font-size:12px}
+.mobile-nav .active{color:#324e23;font-weight:700}
+.mobile-nav .mobile-add{flex:none;background:#243d2c;color:var(--lime);width:54px;height:54px;border-radius:16px;font-size:32px;margin-top:-18px;box-shadow:0 5px 20px #20352025}
+button{min-height:44px;touch-action:manipulation}
+.round-button,.avatar,.sheet header button,.delete{min-width:44px;min-height:44px}
+.date-picker button{width:44px}.date-picker input{font-size:16px;width:150px}
+input,select,textarea{font-size:16px;min-height:48px}
+.entry b,.entry small,.empty-meal,.micro-caption,.chart-footer small,.energy-footer,.energy-footer button,.energy-copy .energy-note{font-size:12px}
+.entry small{line-height:1.5}.food-result{min-height:64px}
+.chart-column{min-width:0;touch-action:manipulation}.chart-column>span:last-child{font-size:12px}
+.page-heading{align-items:flex-start;flex-wrap:wrap}.page-footer{gap:16px}
+.overlay,.sheet{overscroll-behavior:contain;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:env(safe-area-inset-bottom)}
+.dialog,.sheet form{max-height:calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;scroll-padding-bottom:24px}
+.scanner{padding: max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+@media(min-width:700px){
+ .overview-grid,.content-grid{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
+ .meal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .energy-ring{width:150px;min-width:105px}
+ .dialog,.sheet form{max-width:600px;border-radius:26px;padding:28px;margin:auto}
+ .overlay,.sheet{padding:24px;align-items:center}
+ .mobile-nav{left:50%;right:auto;transform:translateX(-50%);width:min(100%,760px);border:1px solid #dfe5d4;border-bottom:0;border-radius:22px 22px 0 0}
+}
+@media(max-width:699px){
+ .workspace{padding-top:max(16px,env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+ .overview-grid,.content-grid,.meal-grid{grid-template-columns:minmax(0,1fr)}
+ .page-heading{display:block}.date-picker{width:max-content;margin-top:18px}
+ .energy-ring{width:135px;min-width:95px}.hero-number{font-size:48px}
+ .energy-footer{flex-wrap:wrap;padding:10px 0;gap:0}
+ .energy-copy .energy-note{max-width:185px;line-height:1.5}
+ .overlay,.sheet{padding:12px 0 0;align-items:flex-end}
+ .dialog,.sheet form{max-height:calc(100dvh - 12px - env(safe-area-inset-top));max-width:none;border-radius:24px 24px 0 0;margin:auto 0 0;padding:22px 18px calc(24px + env(safe-area-inset-bottom))}
+ .chart{gap:8px}.chart-value{font-size:10px}.chart-footer{align-items:flex-start;flex-wrap:wrap}.chart-footer small{max-width:none}
+}
+@media(max-width:359px){.hero-number{font-size:40px}.energy-card{padding-left:15px;padding-right:15px}.energy-ring{width:95px;min-width:85px}.grid{grid-template-columns:1fr}.date-picker input{width:142px}.quick-actions{flex-wrap:wrap}.quick-actions button{flex-basis:100%}}
+@media(orientation:landscape) and (max-height:550px){.workspace{padding-bottom:90px}.mobile-nav{padding-top:4px;padding-bottom:max(4px,env(safe-area-inset-bottom))}.mobile-nav .mobile-add{margin-top:0;height:48px;width:48px}.dialog,.sheet form{max-height:calc(100dvh - 24px);margin:auto;border-radius:20px}.overlay,.sheet{padding:12px;align-items:center}.scanner header{flex-shrink:0}.scanner video{margin:8px 0}}

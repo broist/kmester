@@ -12,12 +12,22 @@ await page.route('**/api/**',async route=>{const path=new URL(route.request().ur
  else if(path==='/api/entries'){entries=[{id:1,food,grams:100,meal:'breakfast',nutrients:{kcal:100,protein:10,carbs:5,fat:4}}];result={id:1}}
  else if(path.startsWith('/api/entries/'))entries=[];
  await route.fulfill({json:result});});
-await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await page.getByText('2 100',{exact:false}).first().waitFor().catch(()=>{});
-for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:900});await page.waitForTimeout(200);if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw new Error('Overflow '+width)}
+await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173');await page.getByText('Napló betöltése…').waitFor({state:'hidden'});
+for(const [width,height] of [[320,568],[390,844],[844,390],[768,1024],[1024,768],[820,1180],[1180,820]]){
+ await page.setViewportSize({width,height});await page.waitForTimeout(200);
+ if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw new Error('Overflow '+width);
+ if(await page.locator('.sidebar').isVisible())throw new Error('Desktop sidebar '+width);
+ if(!await page.locator('.mobile-nav').isVisible())throw new Error('Missing touch navigation '+width);
+ const targets=await page.locator('.mobile-nav button').evaluateAll(nodes=>nodes.every(n=>n.getBoundingClientRect().height>=44&&n.getBoundingClientRect().width>=44));
+ if(!targets)throw new Error('Small touch target '+width);
+ await page.getByRole('button',{name:'Profil megnyitása'}).click();
+ if(await page.locator('.sheet form').evaluate(n=>n.scrollWidth>n.clientWidth))throw new Error('Profile overflow '+width);
+ await page.getByRole('button',{name:'×',exact:true}).click();
+}
 await page.setViewportSize({width:390,height:844});
 await page.getByRole('button',{name:'Étel hozzáadása',exact:true}).click();await page.getByRole('button',{name:/Görög joghurt/}).click();await page.getByRole('button',{name:'+ Hozzáadás a naplóhoz',exact:true}).click();await page.getByRole('button',{name:'Görög joghurt törlése'}).waitFor();
 await page.waitForTimeout(800);await page.screenshot({path:'design-mobile.png',fullPage:true});
 await page.getByRole('button',{name:'Görög joghurt törlése'}).click();await page.getByRole('button',{name:'Profil megnyitása'}).click();await page.getByRole('heading',{name:'Profil és cél',exact:true}).waitFor();
 await page.getByRole('button',{name:'×',exact:true}).click();await page.getByRole('button',{name:'Trendek',exact:false}).click();await page.getByRole('heading',{name:'A számok mögött'}).waitFor();
-await page.setViewportSize({width:1440,height:1000});await page.waitForTimeout(800);await page.screenshot({path:'design-desktop.png',fullPage:true});
-await browser.close();if(errors.length)throw new Error(errors.join('\n'));console.log('PASS: 320/390/768/1440 px, add/delete, profile, trends, no runtime errors.');
+await page.setViewportSize({width:1024,height:768});await page.waitForTimeout(800);await page.screenshot({path:'design-tablet.png',fullPage:true});
+await browser.close();if(errors.length)throw new Error(errors.join('\n'));console.log('PASS: seven phone/tablet viewports, touch navigation, profile overflow, add/delete, trends, no runtime errors.');
