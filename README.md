@@ -28,6 +28,20 @@ kaloria.example.com {
 
 Állítsd az `APP_URL`-t a tényleges, HTTPS-es URL-re, majd indítsd újra: `docker compose up -d`. Caddy automatikusan kezeli a tanúsítványt, ha a domain DNS-e a szerverre mutat és a 80/443-as port elérhető.
 
+### Teljes Ubuntu/Debian élesítés
+
+Ha a domain már a szerver publikus IP-jére mutat, az egyszeri, rootként futtatandó telepítő felrakja a Dockert és Caddyt, klónozza a repót, beállítja a HTTPS reverse proxyt, indítja az alkalmazást, és napi adatbázis-mentést állít be:
+
+```bash
+git clone https://github.com/broist/kmester.git /opt/kmester
+cd /opt/kmester
+cp .env.example .env
+nano .env  # cseréld a titkokat, majd mentsd el
+DEPLOY_DOMAIN=kaloria.example.com ./deploy/install-ubuntu.sh
+```
+
+A mentések alapértelmezetten `/var/backups/kmester` alatt készülnek, 14 napig maradnak meg. Ezt a könyvtárat másold rendszeresen külső tárhelyre is. Frissítéskor: `cd /opt/kmester && git pull --ff-only && docker compose up -d --build`.
+
 ## Adat és mentés
 
 Az adatbázis a `postgres_data` Docker volume-ban perzisztens. Rendszeres, hordozható PostgreSQL mentéshez:
